@@ -28,4 +28,19 @@ module.exports = function(app) {
     
   })
 
+  //Delete saved note
+  app.delete("/api/notes/:id", function(req, res) {
+    const deleteId = req.params.id;
+    for (let i=0; i< notes.length; i++) {
+      if (notes[i].id === deleteId) {
+        // removes the i element from array
+        notes.splice(i,1);
+        break;
+      }
+    }
+
+    //return the data as JSON in the response
+    res.json(notes);
+  });
+
 };
