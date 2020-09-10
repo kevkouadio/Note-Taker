@@ -1,62 +1,39 @@
-// Dependencies
-// =============================================================
-const express = require("express");
-const path = require("path");
-const db = require("./db/db.json");
-const fs = require("fs");
+// ==============================================================================
+// DEPENDENCIES
+// Series of npm packages that we will use to give our server useful functionality
+// ==============================================================================
 
-// Sets up the Express App
-// =============================================================
+var express = require("express");
+
+// ==============================================================================
+// EXPRESS CONFIGURATION
+// This sets up the basic properties for our express server
+// ==============================================================================
+
+// Tells node that we are creating an "express" server
 var app = express();
+
+// Sets an initial port. We"ll use this later in our listener
 var PORT = process.env.PORT || 8080;
 
 // Sets up the Express app to handle data parsing
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static("public"));
-// Routes
-// =============================================================
+// ================================================================================
+// ROUTER
+// The below points our server to a series of "route" files.
+// These routes give our server a "map" of how to respond when users visit or request data from various URLs.
+// ================================================================================
 
-// Basic route that sends the user first to the AJAX Page
-app.get("/notes", function(req, res) {
-    res.sendFile(path.join(__dirname, "public", "notes.html"));
-  });
+require("./routes/apiRoutes")(app);
+require("./routes/htmlRoutes")(app);
 
-app.get("*", function(req, res) {
-    res.sendFile(path.join(__dirname, "public", "index.html"));
-  });
+// =============================================================================
+// LISTENER
+// The below code effectively "starts" our server
+// =============================================================================
 
-app.get("/api/notes", function(req, res) {
-  fs.readFile(path.join(__dirname, "db", "db.json"), 'utf8', (err, jsonString) => {
-    if (err) {
-        console.log("File read failed:", err)
-        return
-    }
-    console.log('File data:', jsonString)
-    response.json(JSON.parse(jsonString));
-    
-})
-  });
-
-// Create New Note - takes in JSON input
-app.post("/api/notes", function(req, res) {
-    // req.body hosts is equal to the JSON post sent from the user
-    
-    var newNote = req.body;
-  
-    //newNote.routeName = newNote.title
-  
-    console.log(newNote);
-  
-    db.push(newNote);
-  
-    res.json(newNote);
-  });
-
-
-// Starts the server to begin listening
-// =============================================================
 app.listen(PORT, function() {
-    console.log("App listening on PORT " + PORT);
-  });
-  console.log(db)
+  console.log("App listening on PORT: " + PORT);
+});
