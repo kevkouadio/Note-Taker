@@ -1,46 +1,53 @@
-// ===============================================================================
-// LOAD DATA
-// We are linking our routes to a series of "data" sources.
-// ===============================================================================
-
-var notes = require("../db/db.json");
-//Module that will generate the notes's ID 
-const { v4: uuidv4 } = require("uuid");
-
-// ===============================================================================
-// ROUTING
-// ===============================================================================
+// routes/apiRoutes.js
+const path = require('path');
+const safeDb = require('../safe-db');
 
 module.exports = function(app) {
-
-  app.get("/api/notes", function(req, res) {
-    res.json(notes);
-  });
-
-  // API POST Requests
-  app.post("/api/notes", function(req, res) {
-    
-    var newNote = req.body;
-    newNote.id = uuidv4();
-    console.log(newNote);
-    notes.push(newNote);
-    res.json(newNote);
-    
-  })
-
-  //Delete saved note
-  app.delete("/api/notes/:id", function(req, res) {
-    const deleteId = req.params.id;
-    for (let i=0; i< notes.length; i++) {
-      if (notes[i].id === deleteId) {
-        // removes the i element from array
-        notes.splice(i,1);
-        break;
-      }
+  // GET all notes
+  app.get('/api/notes', async (req, res) => {
+    try {
+      const notes = await safeDb.loadNotes();
+      res.json(notes);
+    } catch (err) {
+      console.error('/api/notes GET error', err);
+      res.status(500).json({ error: 'Failed to load notes' });
     }
-
-    //return the data as JSON in the response
-    res.json(notes);
   });
 
+  // POST a new note
+  app.post('/api/notes', async (req, res) => {
+    try {
+      const note = req.body;
+      if (!note || !note.title || !note.text) {
+        return res.status(400).json({ error: 'Invalid note' });
+      }
+
+      const notes = await safeDb.loadNotes();
+      // simple id generator - change to uuid if you prefer
+      note.id = Date.now().toString() + Math.random().toString(36).slice(2,8);
+      notes.push(note);
+      await safeDb.saveNotes(notes);
+      res.json(note);
+    } catch (err) {
+      console.error('/api/notes POST error', err);
+      res.status(500).json({ error: 'Failed to save note' });
+    }
+  });
+
+  // DELETE a note by id
+  app.delete('/api/notes/:id', async (req, res) => {
+    try {
+      const id = req.params.id;
+      const notes = await safeDb.loadNotes();
+      const filtered = notes.filter(n => n.id !== id);
+      if (filtered.length === notes.length) {
+        return res.status(404).json({ error: 'Note not found' });
+      }
+      await safeDb.saveNotes(filtered);
+      res.json({ success: true });
+    } catch (err) {
+      console.error('/api/notes DELETE error', err);
+      res.status(500).json({ error: 'Failed to delete note' });
+    }
+  });
 };
