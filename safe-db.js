@@ -55,8 +55,102 @@ async function restoreFromBackup() {
   await fs.copyFile(b, dbPath);
 }
 
+// Remove truly empty backup files (zero bytes, only whitespace, or JSON empty
+// array/object) at startup. This keeps the backups folder tidy and avoids
+// resurrecting deleted notes from empty snapshots.
+async function cleanupEmptyBackups() {
+  try {
+    const files = await fs.readdir(backupsDir).catch(() => []);
+    await Promise.all(
+      files.map(async (f) => {
+        const full = path.join(backupsDir, f);
+        try {
+          const stat = await fs.stat(full).catch(() => null);
+          if (!stat) return;
+
+          // If file is empty, remove it
+          if (stat.size === 0) {
+            await fs.unlink(full).catch(() => {});
+            return;
+          }
+
+          const raw = await fs.readFile(full, 'utf8').catch(() => null);
+          if (raw === null) return;
+          const trimmed = raw.trim();
+
+          // If file is only whitespace, remove it
+          if (trimmed === '') {
+            await fs.unlink(full).catch(() => {});
+            return;
+          }
+
+          // If file is valid JSON and represents an empty array/object, remove it
+          try {
+            const parsed = JSON.parse(trimmed);
+            if ((Array.isArray(parsed) && parsed.length === 0) || (parsed && typeof parsed === 'object' && Object.keys(parsed).length === 0)) {
+              await fs.unlink(full).catch(() => {});
+            }
+          } catch (e) {
+            // not JSON - leave it alone
+          }
+        } catch (e) {
+          // ignore per-file errors; cleanup is best-effort
+        }
+      })
+    );
+  } catch (e) {
+    // ignore directory-level errors; startup should continue regardless
+  }
+}
+
+// Remove backups that contain a specific note id. This is used to ensure that
+// when a note is deleted it does not remain in historical backups.
+async function removeBackupsContainingNote(id) {
+  // Best-effort: for each backup snapshot, remove the note entry if present.
+  // If the snapshot becomes empty after removal, delete the backup file.
+  try {
+    const files = await fs.readdir(backupsDir).catch(() => []);
+    await Promise.all(
+      files.map(async (f) => {
+        const full = path.join(backupsDir, f);
+        try {
+          const raw = await fs.readFile(full, 'utf8').catch(() => null);
+          if (!raw) return;
+          let arr;
+          try {
+            arr = JSON.parse(raw || '[]');
+          } catch (e) {
+            // skip invalid JSON
+            return;
+          }
+          if (!Array.isArray(arr)) return;
+
+          const filtered = arr.filter(n => !(n && n.id === id));
+          if (filtered.length === arr.length) return; // no change
+
+          if (filtered.length === 0) {
+            // no notes left in this backup, remove the file
+            await fs.unlink(full).catch(() => {});
+          } else {
+            // rewrite backup file atomically without the deleted note
+            await atomicWrite(full, JSON.stringify(filtered, null, 2));
+          }
+        } catch (e) {
+          // ignore parse/unlink/write errors for individual files
+        }
+      })
+    );
+  } catch (e) {
+    // ignore errors; cleanup is best-effort
+  }
+}
+
 async function ensureDb() {
   await ensureDirs();
+
+  // Remove empty backups on startup to avoid resurrecting empty snapshots
+  // or keeping useless files in the backups directory.
+  await cleanupEmptyBackups().catch(() => {});
 
   // Create file if doesn't exist (but DO NOT overwrite if it does)
   if (!fsSync.existsSync(dbPath)) {
@@ -126,4 +220,5 @@ module.exports = {
   loadNotes,
   saveNotes,
   dbPath,
+  removeBackupsContainingNote,
 };

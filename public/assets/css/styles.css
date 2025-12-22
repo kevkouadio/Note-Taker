@@ -5,7 +5,43 @@ html, body {
 }
 
 .save-note {
-  display: none;
+  /* will be shown/hidden by toggling .visible for smooth animations */
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 160ms ease, transform 160ms ease;
+  display: inline-block;
+}
+
+.save-note.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Note list item animations */
+.list-group-item.note-item {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+.list-group-item.note-item.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* highlight when newly created or selected */
+.list-group-item.note-item.highlight {
+  animation: highlightFlash 900ms ease;
+}
+@keyframes highlightFlash {
+  0% { background-color: rgba(255, 246, 204, 0.95); }
+  50% { background-color: rgba(255, 250, 230, 0.6); }
+  100% { background-color: transparent; }
+}
+
+/* subtle focus animation for inputs */
+.note-title:focus, .note-textarea:focus {
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06) inset, 0 6px 18px rgba(0,0,0,0.04);
+  transition: box-shadow 180ms ease;
 }
 
 .icons i {

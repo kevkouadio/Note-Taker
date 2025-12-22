@@ -44,6 +44,15 @@ module.exports = function(app) {
         return res.status(404).json({ error: 'Note not found' });
       }
       await safeDb.saveNotes(filtered);
+      // Remove any backups that still contain the deleted note so deleted notes don't persist in backups
+      try {
+        if (typeof safeDb.removeBackupsContainingNote === 'function') {
+          await safeDb.removeBackupsContainingNote(id);
+        }
+      } catch (e) {
+        // non-fatal: log and continue
+        console.error('/api/notes DELETE backup cleanup error', e);
+      }
       res.json({ success: true });
     } catch (err) {
       console.error('/api/notes DELETE error', err);
